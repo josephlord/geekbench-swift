@@ -19,7 +19,7 @@ struct Complex : Printable {
         self.real = real
         self.imaginary = imaginary
     }
-    
+    /*
     mutating func assign(real : Float32, imaginary : Float32) {
         self.real = real
         self.imaginary = imaginary
@@ -39,6 +39,7 @@ struct Complex : Printable {
         self.real -= rhs.real
         self.imaginary -= rhs.imaginary
     }
+*/
 }
 
 func * (left : Complex, right : Complex) -> Complex {
@@ -116,7 +117,7 @@ final class SFFTWorkload : Workload {
 
       o >>= shiftCorrection
 
-      self.output[Int(o)].assign(self.input[chunkOrigin + Int(i)])
+      self.output[Int(o)] = self.input[chunkOrigin + Int(i)]
     }
   }
 
@@ -135,7 +136,7 @@ final class SFFTWorkload : Workload {
     fftWithOrigin(origin + m, size: m, wStep: 2 * wStep)
 
     var wIndex = 0
-    for var offset = 0; offset < m; ++offset {
+    for offset in 0..<m {
       let butterflyTop = origin + offset
       let a = self.output[butterflyTop]
       let b = self.wFactors[wIndex] * self.output[butterflyTop + m]
@@ -157,22 +158,22 @@ final class SFFTWorkload : Workload {
     var tmp1 = Complex()
 
     // FFT length = 2
-    tmp0.assign(s0)
-    s0.add(s1)
-    s1.assign(tmp0 - s1)
+    tmp0 = s0
+    s0 = s0 + s1
+    s1 = tmp0 - s1
 
-    tmp1.assign(t0)
-    t0.add(t1)
-    t1.assign(tmp1 - t1)
+    tmp1 = t0
+    t0 = t0 + t1
+    t1 = tmp1 - t1
 
     // FFT length = 4
-    tmp0.assign(s0)
-    tmp1.assign(s1)
-    t1.assign(t1.imaginary, imaginary: -t1.real)
-    s0.add(t0)
-    s1.add(t1)
-    t0.assign(tmp0 - t0)
-    t1.assign(tmp1 - t1)
+    tmp0 = s0
+    tmp1 = s1
+    t1 = Complex(real: t1.imaginary, imaginary: -t1.real)
+    s0 = s0 + t0
+    s1 = s1 + t1
+    t0 = tmp0 - t0
+    t1 = tmp1 - t1
 
     self.output[origin] = s0;
     self.output[origin + 1] = s1;
