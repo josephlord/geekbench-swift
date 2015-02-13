@@ -41,22 +41,22 @@ final class SGEMMWorkload : Workload {
   }
   
   override func worker() {
-    for var i = 0; i < matrixSize; i += blockSize {
-      for var j = 0; j < matrixSize; j += blockSize {
-        for var k = 0; k < matrixSize; k += blockSize {
+    for i in stride(from: 0, to: matrixSize, by: blockSize) {
+      for j in stride(from: 0, to: matrixSize, by: blockSize) {
+        for k in stride(from: 0, to: matrixSize, by: blockSize){
 
           let ib = min(matrixSize, i + blockSize)
           let jb = min(matrixSize, j + blockSize)
           let kb = min(matrixSize, k + blockSize)
 
-          for var i0 = i; i0 < ib; ++i0 {
-            for var j0 = j; j0 < jb; ++j0 {
+          for i0 in i..<ib {
+            for j0 in j..<jb {
 
               let c = C[i0, j0]
 
               var scratch = c
 
-              for var k0 = k; k0 < kb; ++k0 {
+              for k0 in k..<kb {
 
                 let a = A[i0, k0]
                 let b = B[j0, k0]
@@ -67,7 +67,6 @@ final class SGEMMWorkload : Workload {
               C[i0, j0] = scratch
             }
           }
-
         }
       }
     }
