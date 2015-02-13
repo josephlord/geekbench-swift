@@ -34,7 +34,7 @@ final class MandelbrotWorkload : Workload {
         var zr = zr0
         var zc = zc0
 
-        var k = 0
+        var k:UInt8 = 0
         for _ in 0..<255 {
           let tr = zr
 
@@ -51,9 +51,9 @@ final class MandelbrotWorkload : Workload {
         }
 
         let index = Int(width * y + x)
-        let value = UInt8(min(max(k, 0), 255))
+        //let value = UInt8(min(max(k, 0), 255))
 
-        outputLocal[index] = value
+        outputLocal[index] = k
       }
     }
     self.output = outputLocal
