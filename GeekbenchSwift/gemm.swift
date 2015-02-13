@@ -45,14 +45,19 @@ final class SGEMMWorkload : Workload {
   
   override func worker() {
     var CintCopy = C.M
-    
-    
-    CintCopy.withUnsafeMutableBufferPointer{ (inout cBuffer:UnsafeMutableBufferPointer<Float>)->() in
-        SGEMMWorkload.internalWorker(self.matrixSize, blockSize:self.blockSize, A: self.A, B: self.B, Cbuffer:&cBuffer)
+    let AintCopy = A.M
+    let BintCopy = B.M
+    BintCopy.withUnsafeBufferPointer { (bBuffer) in
+    AintCopy.withUnsafeBufferPointer { (aBuffer) in
+    CintCopy.withUnsafeMutableBufferPointer{ (inout cBuffer:
+        UnsafeMutableBufferPointer<Float>)->() in
+        SGEMMWorkload.internalWorker(self.matrixSize, blockSize:self.blockSize, A: aBuffer, B: bBuffer, Cbuffer:&cBuffer)
      }
+    }
+    }
   }
     
-    static func internalWorker(matrixSize: Int, blockSize:Int, A:Matrix, B:Matrix, inout Cbuffer:UnsafeMutableBufferPointer<Float> ) {
+    static func internalWorker(matrixSize: Int, blockSize:Int, A:UnsafeBufferPointer<Float>, B:UnsafeBufferPointer<Float>, inout Cbuffer:UnsafeMutableBufferPointer<Float> ) {
     for i in stride(from: 0, to: matrixSize, by: blockSize) {
       for j in stride(from: 0, to: matrixSize, by: blockSize) {
         for k in stride(from: 0, to: matrixSize, by: blockSize){
@@ -72,8 +77,8 @@ final class SGEMMWorkload : Workload {
 
               for k0 in k..<kb {
 
-                let a = A.M[iLineOffset + k0]
-                let b = B.M[jLineOffset + k0]
+                let a = A[iLineOffset + k0]
+                let b = B[jLineOffset + k0]
 
                 scratch += a * b
               }
