@@ -7,15 +7,17 @@ import Foundation
 final class MandelbrotWorkload : Workload {
   let width : UInt
   let height : UInt
-  var output : [UInt8]? = nil
+    //var output : [UInt8]? = nil
+    var output:[UInt8]
 
   init(width : UInt, height : UInt) {
     self.width = width
     self.height = height
+    output = [UInt8](count: Int(self.width * self.height), repeatedValue: 0)
   }
 
   override func worker() {
-    var outputLocal = [UInt8](count: Int(self.width * self.height), repeatedValue: 0)
+    //    var outputLocal = [UInt8](count: Int(self.width * self.height), repeatedValue: 0)
 
     // Origin
     let ro : Float = -1.5
@@ -53,10 +55,11 @@ final class MandelbrotWorkload : Workload {
         let index = Int(width * y + x)
         //let value = UInt8(min(max(k, 0), 255))
 
-        outputLocal[index] = k
+        //outputLocal[index] = k
+        self.output[index] = k
       }
     }
-    self.output = outputLocal
+    //self.output = outputLocal
   }
 
   override func reset() {
@@ -64,7 +67,7 @@ final class MandelbrotWorkload : Workload {
 
   override func work() -> UInt64 {
     var work : UInt64 = 0
-    for element in self.output ?? [] {
+    for element in self.output {// ?? [] {
         work += UInt64(11) * UInt64(element)
     }
     return work
