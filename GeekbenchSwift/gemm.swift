@@ -5,12 +5,15 @@
 import Foundation
 
 struct Matrix {
-  var N : Int
+  let N : Int
   var M : [Float32]
+/*    let M_internal: ManagedBuffer<
+    var M : UnsafeMutablePointer<Float32>*/
 
   init(matrixSize : Int) {
     self.N = matrixSize
-    self.M = [Float32](count: matrixSize * matrixSize, repeatedValue: 0)
+    self.M = [Float](count: matrixSize * matrixSize, repeatedValue: 0)
+    //self.M = UnsafeMutablePointer<Float32>.alloc(matrixSize * matrixSize)
   }
 
   subscript(i1: Int, i2: Int) -> Float32 {
@@ -25,8 +28,8 @@ struct Matrix {
 }
 
 final class SGEMMWorkload : Workload {
-  var matrixSize : Int = 0
-  var blockSize : Int = 0
+  let matrixSize : Int
+  let blockSize : Int
   final var A : Matrix
   final var B : Matrix
   final var C : Matrix
@@ -41,6 +44,15 @@ final class SGEMMWorkload : Workload {
   }
   
   override func worker() {
+    var CintCopy = C.M
+    
+    
+    CintCopy.withUnsafeMutableBufferPointer{ (inout cBuffer:UnsafeMutableBufferPointer<Float>)->() in
+        SGEMMWorkload.internalWorker(self.matrixSize, blockSize:self.blockSize, A: self.A, B: self.B, C: &self.C, Cbuffer:&cBuffer)
+     }
+  }
+    
+    static func internalWorker(matrixSize: Int, blockSize:Int, A:Matrix, B:Matrix, inout C:Matrix, inout Cbuffer:UnsafeMutableBufferPointer<Float> ) {
     for i in stride(from: 0, to: matrixSize, by: blockSize) {
       for j in stride(from: 0, to: matrixSize, by: blockSize) {
         for k in stride(from: 0, to: matrixSize, by: blockSize){
@@ -51,10 +63,10 @@ final class SGEMMWorkload : Workload {
 
           for i0 in i..<ib {
             for j0 in j..<jb {
+              let bufferIndex = i0 * matrixSize + j0
+                //let c = C[i0, j0]
 
-              let c = C[i0, j0]
-
-              var scratch = c
+              var scratch = Cbuffer[bufferIndex]
 
               for k0 in k..<kb {
 
@@ -64,7 +76,8 @@ final class SGEMMWorkload : Workload {
                 scratch += a * b
               }
 
-              C[i0, j0] = scratch
+                //C[i0, j0] = scratch
+              Cbuffer[bufferIndex] = scratch
             }
           }
         }
