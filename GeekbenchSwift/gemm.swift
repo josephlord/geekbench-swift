@@ -48,12 +48,12 @@ final class SGEMMWorkload : Workload {
     let AintCopy = A.M
     let BintCopy = B.M
     BintCopy.withUnsafeBufferPointer { (bBuffer) in
-    AintCopy.withUnsafeBufferPointer { (aBuffer) in
-    CintCopy.withUnsafeMutableBufferPointer{ (inout cBuffer:
-        UnsafeMutableBufferPointer<Float>)->() in
+      AintCopy.withUnsafeBufferPointer { (aBuffer) in
+        CintCopy.withUnsafeMutableBufferPointer{ (inout cBuffer:
+          UnsafeMutableBufferPointer<Float>)->() in
         SGEMMWorkload.internalWorker(self.matrixSize, blockSize:self.blockSize, A: aBuffer, B: bBuffer, Cbuffer:&cBuffer)
-     }
-    }
+        }
+      }
     }
   }
     
@@ -70,17 +70,19 @@ final class SGEMMWorkload : Workload {
             let iLineOffset = i0 * matrixSize
             for j0 in j..<jb {
               let jLineOffset = j0 * matrixSize
-              let bufferIndex = i0 * matrixSize + j0
+              let bufferIndex = iLineOffset + j0
                 //let c = C[i0, j0]
 
               var scratch = Cbuffer[bufferIndex]
 
               for k0 in k..<kb {
-
+/*
                 let a = A[iLineOffset + k0]
                 let b = B[jLineOffset + k0]
 
                 scratch += a * b
+*/
+                scratch += A[iLineOffset + k0] * B[jLineOffset + k0]
               }
 
                 //C[i0, j0] = scratch
