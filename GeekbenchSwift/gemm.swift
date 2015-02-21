@@ -71,17 +71,10 @@ final class SGEMMWorkload : Workload {
             for j0 in j..<jb {
               let jLineOffset = j0 * matrixSize
               let bufferIndex = iLineOffset + j0
-                //let c = C[i0, j0]
 
               var scratch = Cbuffer[bufferIndex]
 
               for k0 in k..<kb {
-/*
-                let a = A[iLineOffset + k0]
-                let b = B[jLineOffset + k0]
-
-                scratch += a * b
-*/
                 scratch += A[iLineOffset + k0] * B[jLineOffset + k0]
               }
 
