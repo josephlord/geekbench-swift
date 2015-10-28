@@ -1,33 +1,77 @@
 // Copyright (c) 2014 Primate Labs Inc.
 // Use of this source code is governed by the 2-clause BSD license that
 // can be found in the LICENSE file.
-
 import Foundation
 
-class SFFTWorkload : Workload {
+struct Complex : Printable {
+    internal var real : Float32
+    internal var imaginary : Float32
+    var description: String {
+        return String(format: "(%.5f, %.5fi)", real, imaginary)
+    }
+    
+    init() {
+        self.real = 0
+        self.imaginary = 0
+    }
+    
+    init(real : Float32, imaginary : Float32) {
+        self.real = real
+        self.imaginary = imaginary
+    }
+    
+    mutating func assign(real : Float32, imaginary : Float32) {
+        self.real = real
+        self.imaginary = imaginary
+    }
+    
+    mutating func assign(rhs : Complex) {
+        self.real = rhs.real
+        self.imaginary = rhs.imaginary
+    }
+    
+    mutating func add(rhs : Complex) {
+        self.real += rhs.real
+        self.imaginary += rhs.imaginary
+    }
+    
+    mutating func subtract(rhs : Complex) {
+        self.real -= rhs.real
+        self.imaginary -= rhs.imaginary
+    }
+}
+
+func * (left : Complex, right : Complex) -> Complex {
+    return Complex(real: left.real * right.real - left.imaginary * right.imaginary,
+        imaginary: left.real * right.imaginary + left.imaginary * right.real)
+}
+
+func + (left : Complex, right : Complex) -> Complex {
+    return Complex(real: left.real + right.real, imaginary: left.imaginary + right.imaginary)
+}
+
+func - (left : Complex, right : Complex) -> Complex {
+    return Complex(real: left.real - right.real, imaginary: left.imaginary - right.imaginary)
+}
+
+
+final class SFFTWorkload : Workload {
   let pi = Float32(acos(-1.0))
 
-  var size : Int
-  var chunkSize : Int
-  var input : [Complex] = []
-  var output : [Complex] = []
+  let size : Int
+  let chunkSize : Int
+  var input : [Complex]
+  var output : UnsafeMutablePointer<Complex>
   var wFactors : [Complex] = []
 
   init(size : Int, chunkSize : Int) {
     self.size = size
     self.chunkSize = chunkSize
 
-    self.input.reserveCapacity(size)
-
-    for _ in 0..<size {
-      self.input.append(Complex())
-    }
-
-    self.output.reserveCapacity(chunkSize)
-
-    for _ in 0..<chunkSize {
-      self.output.append(Complex())
-    }
+    self.input = [Complex](count: size, repeatedValue: Complex())
+    self.output = UnsafeMutablePointer<Complex>.alloc(chunkSize)
+    
+    
 
     // Precompute w factors
     self.wFactors.reserveCapacity(chunkSize)
@@ -40,12 +84,15 @@ class SFFTWorkload : Workload {
 
   }
 
+  deinit {
+    self.output.dealloc(chunkSize)
+  }
+
   override func worker() {
-    for var chunkOrigin = 0; chunkOrigin < self.size; chunkOrigin += self.chunkSize {
+    for chunkOrigin in stride(from: 0, to: self.size, by: self.chunkSize) {
       reorderInputIntoOutput(chunkOrigin)
       executeInplaceFFTOnOutput(chunkOrigin)
     }
-
   }
 
   func reorderInputIntoOutput(chunkOrigin : Int) {
@@ -54,7 +101,7 @@ class SFFTWorkload : Workload {
     // Right shift requred to account for unused leading zeros in the UInt32
     let shiftCorrection = countLeadingZeros(chunkSize) + 1
 
-    for var i : UInt32 = 0; i < chunkSize; ++i {
+    for i in 0..<chunkSize {
       var o = i
       // Reverse the bits of o
       o = (o & 0x55555555) << 1 | (o & 0xAAAAAAAA) >> 1
@@ -65,15 +112,16 @@ class SFFTWorkload : Workload {
 
       o >>= shiftCorrection
 
-      self.output[Int(o)].assign(self.input[Int(chunkOrigin + i)])
+      self.output[Int(o)].assign(self.input[chunkOrigin + Int(i)])
     }
   }
 
   func executeInplaceFFTOnOutput(chunkOrigin : Int) {
-    fftWithOrigin(0, size: chunkSize, wStep: 1)
+    self.fftWithOrigin(0, size: self.chunkSize, wStep: 1)
   }
 
   func fftWithOrigin(origin : Int, size : Int,  wStep : Int) {
+        
     if size == 4 {
       fft4WithOrigin(origin)
       return
@@ -84,13 +132,13 @@ class SFFTWorkload : Workload {
     fftWithOrigin(origin + m, size: m, wStep: 2 * wStep)
 
     var wIndex = 0
-    for var offset = 0; offset < m; ++offset {
+    for offset in 0..<m {
       let butterflyTop = origin + offset
-      let a = self.output[butterflyTop]
-      let b = self.wFactors[wIndex] * self.output[butterflyTop + m]
+      let a = output[butterflyTop]
+      let b = self.wFactors[wIndex] * output[butterflyTop + m]
 
-      self.output[butterflyTop] = a + b
-      self.output[butterflyTop + m] = a - b
+      output[butterflyTop] = a + b
+      output[butterflyTop + m] = a - b
 
       wIndex += wStep
     }
@@ -98,10 +146,11 @@ class SFFTWorkload : Workload {
 
   // Compute the bottom 2 stages of the FFT recursion (FFTs of length 4 and 2)
   func fft4WithOrigin(origin : Int) {
-    var s0 = self.output[origin]
-    var s1 = self.output[origin + 1]
-    var t0 = self.output[origin + 2]
-    var t1 = self.output[origin + 3]
+    
+    var s0 = output[origin]
+    var s1 = output[origin + 1]
+    var t0 = output[origin + 2]
+    var t1 = output[origin + 3]
     var tmp0 = Complex()
     var tmp1 = Complex()
 
@@ -123,11 +172,10 @@ class SFFTWorkload : Workload {
     t0.assign(tmp0 - t0)
     t1.assign(tmp1 - t1)
 
-    self.output[origin] = s0;
-    self.output[origin + 1] = s1;
-    self.output[origin + 2] = t0;
-    self.output[origin + 3] = t1;
-
+    output[origin] = s0;
+    output[origin + 1] = s1;
+    output[origin + 2] = t0;
+    output[origin + 3] = t1;
   }
 
   func countLeadingZeros(value : UInt32) -> UInt32 {
